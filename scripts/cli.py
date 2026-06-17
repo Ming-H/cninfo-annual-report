@@ -26,7 +26,7 @@ from typing import List, Optional
 
 
 SKILL_NAME = "cninfo-annual-report"
-SKILL_VERSION = "1.3.0"
+SKILL_VERSION = "2.0.0"
 
 CNINFO_QUERY_URL = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
 CNINFO_PDF_BASE = "https://static.cninfo.com.cn/"
@@ -99,6 +99,23 @@ def detect_column(stock: str) -> Optional[str]:
         else:
             return "szse"
     return None
+
+
+def detect_market(stock: str, market: str = "auto") -> str:
+    """
+    判断市场：A股(cninfo) 还是 港股(HKEX)。
+    显式 --market a/hk 优先；自动：6位代码→A股，4-5位代码→港股，名称默认 A股。
+    """
+    code = stock.strip()
+    if market == "hk":
+        return "hk"
+    if market == "a":
+        return "a"
+    if re.fullmatch(r"\d{6}", code):
+        return "a"
+    if re.fullmatch(r"\d{4,5}", code):
+        return "hk"
+    return "a"  # 名称默认按 A 股，港股请用代码或 -m hk
 
 
 def extract_company_name(title: str) -> str:
@@ -441,6 +458,11 @@ def download_single(
 
 def cmd_search(args):
     """搜索报告公告列表。"""
+    if detect_market(args.stock, getattr(args, "market", "auto")) == "hk":
+        print(json.dumps({"success": False, "market": "hk",
+            "error": "港股请直接用 download 命令（HKEX 搜索由浏览器驱动，已集成在 download 流程中）"},
+            ensure_ascii=False, indent=2))
+        return
     report_type = args.type
     if report_type == "all":
         # 列出所有类型
@@ -480,8 +502,36 @@ def cmd_search(args):
 
 # ─── 子命令：download ───────────────────────────────────────
 
+def cmd_download_hk(args):
+    """港股下载：委托 hkex 模块(Playwright 驱动 HKEX 披露易)。"""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    spec = importlib.util.spec_from_file_location("hkex", os.path.join(here, "hkex.py"))
+    hkex = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hkex)
+
+    if args.type in ("q1", "q3", "all"):
+        print(json.dumps({"success": False, "market": "hk", "stock": args.stock,
+            "error": "港股只有年报(annual)和中期报告(interim)，不支持 q1/q3/all"},
+            ensure_ascii=False, indent=2))
+        return
+
+    years = parse_years(args.year)
+    output_dir = args.output or "."
+    results = [hkex.download_single(args.stock, y, args.type, output_dir) for y in years]
+    succeeded = [r for r in results if r.get("success")]
+    print(json.dumps({
+        "success": len(succeeded) > 0, "stock": args.stock, "market": "hk",
+        "total": len(results), "downloaded": len(succeeded),
+        "failed": len(results) - len(succeeded), "results": results,
+    }, ensure_ascii=False, indent=2))
+
+
 def cmd_download(args):
     """搜索并下载报告 PDF。"""
+    market = detect_market(args.stock, getattr(args, "market", "auto"))
+    if market == "hk":
+        return cmd_download_hk(args)
     output_dir = args.output or "."
     years = parse_years(args.year)
 
@@ -617,6 +667,13 @@ def _add_common_args(parser):
         choices=list(REPORT_TYPES.keys()) + ["all"],
         default="annual",
         help="报告类型: annual/semi/q1/q3/all（默认: annual）",
+    )
+    parser.add_argument(
+        "--market", "-m",
+        type=str,
+        choices=["auto", "a", "hk"],
+        default="auto",
+        help="市场: auto(自动判断) / a(A股) / hk(港股)，默认 auto",
     )
     parser.add_argument(
         "--timeout",

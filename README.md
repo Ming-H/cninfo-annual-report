@@ -1,13 +1,14 @@
 # cninfo-annual-report 📄
 
-> Claude Code Skill - 从巨潮资讯网下载 A 股上市公司定期报告 PDF
+> Claude Code Skill - 下载 A 股（巨潮资讯网）与 港股（HKEX 披露易）上市公司财报 PDF
 
 ## 功能
 
-- 📥 **下载定期报告**：年报、半年报、一季报、三季报
+- 📥 **A 股定期报告**：年报、半年报、一季报、三季报（巨潮资讯网）
+- 🇭🇰 **港股报告**：年报、中期报告（HKEX 披露易，港股无季报）
 - 🔍 **搜索公告**：按公司名称或股票代码搜索
 - 📦 **批量下载**：支持下载多年报告、某年全部报告类型
-- 🏢 **自动识别交易所**：上交所 / 深交所
+- 🏢 **自动识别市场**：A 股（上交所/深交所）/ 港股，按代码自动判断
 - ✅ **智能筛选正本**：自动排除摘要、更正、补充等
 
 ## 安装
@@ -56,6 +57,23 @@ python3 scripts/cli.py download --stock "三一重工" --year 2023-2025 -o /tmp/
 python3 scripts/cli.py search --stock "三一重工" --year 2025
 ```
 
+### 港股下载（HKEX 披露易）
+
+港股通过 Playwright 驱动 HKEX 披露易搜索页（该站为 JSF + 反爬，纯 HTTP 无法搜索）。**港股只有年报和中期报告，无季报。**
+
+```bash
+# 港股年报（建滔积层板 01888）
+python3 scripts/cli.py download --stock 01888 --year 2025 -o /tmp/
+
+# 港股中期报告
+python3 scripts/cli.py download --stock 01888 --year 2025 --type interim -o /tmp/
+
+# 显式指定市场（名称默认按 A 股，港股名称需 -m hk）
+python3 scripts/cli.py download --stock 01888 --year 2025 -m hk -o /tmp/
+```
+
+> 港股依赖：`pip install playwright`（使用系统 Chrome，无需 `playwright install`）
+
 ### 参数说明
 
 | 参数 | 说明 | 默认值 |
@@ -63,6 +81,7 @@ python3 scripts/cli.py search --stock "三一重工" --year 2025
 | `--stock` / `-s` | 股票名称或代码 | 必填 |
 | `--year` / `-y` | 年份：`2025` / `2023-2025` / `2023,2025` | 必填 |
 | `--type` / `-t` | 报告类型：`annual` / `semi` / `q1` / `q3` / `all` | `annual` |
+| `--market` / `-m` | 市场：`auto` / `a` / `hk`（6位代码=A股，4-5位=港股） | `auto` |
 | `--output` / `-o` | 下载目录 | 当前目录 |
 | `--timeout` | 超时秒数 | 30 |
 
@@ -77,8 +96,9 @@ python3 scripts/cli.py search --stock "三一重工" --year 2025
 
 ## 技术特点
 
-- **零依赖**：纯 Python 3 标准库，无需安装任何第三方包
-- **数据来源**：[巨潮资讯网](http://www.cninfo.com.cn)（证监会指定信息披露平台）
+- **A 股零依赖**：纯 Python 3 标准库，无需安装任何第三方包
+- **港股**：HKEX 披露易为 JSF + 反爬站点，用 Playwright 驱动（`pip install playwright`，用系统 Chrome）
+- **数据来源**：A 股 [巨潮资讯网](http://www.cninfo.com.cn) / 港股 [HKEX 披露易](https://www1.hkexnews.hk)
 - **PDF 校验**：自动验证下载文件是否为合法 PDF
 
 ## 输出示例

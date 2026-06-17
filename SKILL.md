@@ -1,6 +1,6 @@
 ---
 name: cninfo-annual-report
-description: 从巨潮资讯网（cninfo.com.cn）搜索并下载 A 股上市公司定期报告 PDF，支持年报、半年报、一季报、三季报，按公司名称或股票代码查询，自动筛选正本（排除摘要、更正等）。当用户需要下载财报、获取年报 PDF、查看公告原文时使用此技能。
+description: 下载上市公司财报 PDF，支持 A 股（巨潮资讯网，年报/半年报/一季报/三季报）与 港股（HKEX 披露易，年报/中期报告）。按公司名称或代码查询，自动筛选正本（排除摘要/更正等）。当用户需要下载财报、年报/季报 PDF、查看公告原文时使用。
 license: Complete terms in LICENSE.txt
 ---
 
@@ -8,7 +8,7 @@ license: Complete terms in LICENSE.txt
 
 ## 版本
 
-`1.3.0`
+`2.0.0`
 
 ## 技能概述
 
@@ -21,8 +21,30 @@ license: Complete terms in LICENSE.txt
 - **搜索报告**：按公司名称或股票代码搜索报告公告列表
 - **下载报告**：自动筛选正本并下载 PDF 到本地
 - **多交易所支持**：自动识别上交所（sse）和深交所（szse）
+- **港股支持**：通过 HKEX 披露易下载港股年报、中期报告（港股无季报）
 
-数据来源：**巨潮资讯网**（http://www.cninfo.com.cn）— 中国证监会指定信息披露平台
+数据来源：
+- **A股**：巨潮资讯网（http://www.cninfo.com.cn）— 证监会指定信息披露平台
+- **港股**：HKEX 披露易（https://www1.hkexnews.hk）— 港交所，需 Playwright
+
+## 港股下载（HKEX 披露易）
+
+港股由 `scripts/hkex.py`（Playwright 驱动 HKEX 披露易搜索页）实现：输入代码 → 选自动补全 → 搜索 → 按标题筛年报/中期报告 → 下 PDF。
+
+```bash
+# 港股年报（建滔积层板 01888）
+python3 scripts/cli.py download --stock 01888 --year 2025 -o /tmp/
+
+# 港股中期报告
+python3 scripts/cli.py download --stock 01888 --year 2025 --type interim -o /tmp/
+
+# 显式指定市场
+python3 scripts/cli.py download --stock 01888 --year 2025 -m hk -o /tmp/
+```
+
+- **市场判断**（自动）：6位代码=A股、4-5位代码=港股、名称默认 A股（港股请用代码或 `-m hk`）。
+- **报告类型**：港股只有 `annual`（年报）和 `interim`（中期报告），**无 q1/q3**（港交所不要求季报）。
+- **依赖**：港股需 `pip install playwright`（用系统 Chrome，**无需** `playwright install chromium`）。A 股仍为零依赖。
 
 ## 核心处理流程
 
